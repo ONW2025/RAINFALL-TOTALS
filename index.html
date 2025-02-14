@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Weather Information</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Overpass:wght@900&display=swap');
+
+    * {
+      font-family: 'Overpass Black', sans-serif !important;
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: #000;
+      color: white;
+    }
+
+    /* Fixed resolution container: set to 1200x800 pixels */
+    #map-container {
+      position: relative;
+      width: 1620px;   /* fixed width */
+      height: 780px;   /* fixed height */
+      margin: 0 auto;  /* center horizontally */
+      background-image: url('blank map tyler (1).png');
+      background-size: 100% 100%; /* stretch image to exactly fill container */
+      background-position: center;
+      background-repeat: no-repeat;
+    }
+
+    /* Overlays will be positioned absolutely within the fixed container */
+    #weather-info-container {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+    }
+
+    .weather-card {
+      font-size: 1.5em;
+      text-shadow: 3px 1px 1px rgba(0, 0, 0, 0.7);
+      -webkit-text-stroke: 0.0px black;
+      color: white;
+      padding: 20px;
+      margin: 10px;
+      text-align: center;
+      background: rgba(0, 0, 0, 0);
+      border-radius: 10px;
+      position: absolute;
+      display: flex;
+      flex-direction: column; /* Stack items vertically */
+      align-items: center;    /* Center horizontally */
+      justify-content: flex-start; /* Align items from the top */
+      width: 200px; /* Fixed width */
+      height: auto;
+    }
+
+    /* City (station) name card styling */
+    .station-name-card {
+      font-size: 1.0em;
+      text-shadow: 1px 1px 10px rgba(0, 0, 0, 3), 1px 10px 10px rgba(0, 0, 0, 5);
+      margin-bottom: 10px;
+      position: relative;
+      overflow: visible;
+    }
+
+    .station-text {
+      position: relative;
+      z-index: 1;
+    }
+
+    .station-name-card .edit-temp-btn,
+    .station-name-card .temp-edit-input {
+      display: none;
+    }
+
+    .station-name-card:hover .edit-temp-btn,
+    .station-name-card:hover .temp-edit-input {
+      display: inline-block;
+    }
+
+    .station-name-card .edit-temp-btn {
+      position: absolute;
+      top: 0;
+      right: 0;
+      z-index: 2;
+      background-color: rgba(255, 255, 255, 0.3);
+      border: 1px solid white;
+      color: white;
+      cursor: pointer;
+      padding: 3px 6px;
+      font-size: 0.8em;
+    }
+
+    .station-name-card .temp-edit-input {
+      position: absolute;
+      top: 100%;
+      right: 0;
+      z-index: 2;
+      margin-top: 2px;
+      padding: 5px;
+      border: 1px solid #ccc;
+      font-size: 0.9em;
+      text-align: center;
+      width: 60px;
+    }
+
+    .temperature-card {
+      font-family: 'Roboto', sans-serif;
+      font-size: 2em;
+      text-shadow: 0 0 10px rgba(0, 0, 0, 3), 0 0 10px rgba(0, 0, 0, 5);
+      color: white;
+      margin-top: 25px;
+      position: relative;
+    }
+
+    .temperature-card .degree-symbol {
+      font-size: 0.8em;
+      vertical-align: 8px;
+      margin-left: -12px;
+      position: relative;
+    }
+
+    .rename-input {
+      background: rgba(255, 255, 255, 0.7);
+      border: none;
+      padding: 5px;
+      margin-top: 10px;
+      width: 100%;
+      font-size: 1em;
+      text-align: center;
+    }
+
+    /* Adjust timestamp positioning within the fixed container */
+    #timestamp {
+      position: absolute;
+      bottom: 20px;
+      left: 20px;
+      font-family: 'Overpass', sans-serif;
+      font-size: 1.5em;
+      color: white;
+      text-shadow: 0 0 10px rgba(0, 0, 0, 3), 0 0 10px rgba(0, 0, 0, 5);
+      padding: 10px 20px;
+      border-radius: 5px;
+      text-align: left;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="map-container">
+    <div id="weather-info-container"></div>
+    <div id="timestamp"></div>
+  </div>
+
+  <script>
+    const apiKey = '8caa9f6756a74d03aa9f6756a79d03a3';
+    const stationIds = [
+      'KOHCHILL102', 'KOHCOLUM839', 'KOHDAYTO48', 'KOHCINCI470', 'KOHGALLI12', 'KOHTOLED157', 'KOHCLEVE358', 'KOHYOUNG19', 'KOHSAINT50', 'KOHMARIE95',
+      'KOHDEFIA24', 'KOHCELIN50', 'KOHLIMA26', 'KOHFINDL106', 'KOHBELLE16', 'KOHMARIO107', 'KOHWILMI89', 'KOHGEORG3', 'KOHPORTS28', 'KOHLOGAN27',
+      'KOHZANES81', 'KOHMOUNT134', 'KOHMANSF8', 'KOHSANDU69', 'KOHASHTA21', 'KOHAKRON234', 'KOHCANTO106', 'KOHCOSHO14'
+    ];
+
+    const stationNames = {
+      'KOHCHILL102': 'Chillicothe',
+      'KOHCOLUM839': 'Columbus',
+      'KOHDAYTO48': 'Dayton',
+      'KOHCINCI470': 'Cincinnati',
+      'KOHGALLI12': 'Gallipolis',
+      'KOHTOLED157': 'Toledo',
+      'KOHCLEVE358': 'Cleveland',
+      'KOHYOUNG19': 'Youngstown',
+      'KOHSAINT20': 'St. Clairsville',
+      'KOHMARIE95': 'Marietta',
+      'KOHDEFIA24': 'Defiance',
+      'KOHCELIN50': 'Celina',
+      'KOHLIMA26': 'Lima',
+      'KOHFINDL106': 'Findlay',
+      'KOHBELLE16': 'Bellefontaine',
+      'KOHMARIO107': 'Marion',
+      'KOHWILMI89': 'Wilmington',
+      'KOHGEORG3': 'Georgetown',
+      'KOHPORTS28': 'Portsmouth',
+      'KOHLOGAN27': 'Logan',
+      'KOHZANES81': 'Zanesville',
+      'KOHMOUNT134': 'Mt. Vernon',
+      'KOHMANSF8': 'Mansfield',
+      'KOHSANDU69': 'Sandusky',
+      'KOHASHTA21': 'Ashtabula',
+      'KOHAKRON234': 'Akron',
+      'KOHCANTO106': 'Canton',
+      'KOHCOSHO14': 'Coshocton'
+    };
+
+    const stationTemperatures = {};
+    const manualTemperatures = {};
+
+    // Positions relative to the fixed container (1200x800)
+    const stationPositions = {
+      'KOHCHILL102': { top: '60%', left: '37%' },
+      'KOHCOLUM839': { top: '44%', left: '37%' },
+      'KOHDAYTO48': { top: '58.5%', left: '26.5%' },
+      'KOHCINCI470': { top: '74.5%', left: '23%' },
+      'KOHGALLI12': { top: '83.5%', left: '47.9%' },
+      'KOHTOLED157': { top: '7.5%', left: '34%' },
+      'KOHCLEVE358': { top: '11.5%', left: '53%' },
+      'KOHYOUNG19': { top: '23%', left: '64.5%' },
+      'KOHSAINT50': { top: '50%', left: '61.5%' },
+      'KOHMARIE95': { top: '67%', left: '56%' },
+      'KOHDEFIA24': { top: '17%', left: '25%' },
+      'KOHCELIN50': { top: '37%', left: '23%' },
+      'KOHLIMA26': { top: '32%', left: '27.5%' },
+      'KOHFINDL106': { top: '23%', left: '32.5%' },
+      'KOHBELLE16': { top: '42%', left: '31.5%' },
+      'KOHMARIO107': { top: '36%', left: '38%' },
+      'KOHWILMI89': { top: '68%', left: '31%' },
+      'KOHGEORG3': { top: '82.5%', left: '30.5%' },
+      'KOHPORTS28': { top: '85%', left: '40%' },
+      'KOHLOGAN27': { top: '65.0%', left: '46%' },
+      'KOHZANES81': { top: '54%', left: '50%' },
+      'KOHMOUNT134': { top: '42%', left: '45%' },
+      'KOHMANSF8': { top: '31%', left: '44.5%' },
+      'KOHSANDU69': { top: '13%', left: '43%' },
+      'KOHASHTA21': { top: '2%', left: '64%' },
+      'KOHAKRON234': { top: '23%', left: '54.9%' },
+      'KOHCANTO106': { top: '30.5%', left: '56.5%' },
+      'KOHCOSHO14': { top: '44.5%', left: '52%' }
+    };
+
+    const disabledStations = [
+      'STATION3', 'STATION4', 'STATION5', 'STATION6', 'STATION7', 'STATION8', 'STATION9', 'STATION10',
+      'STATION11', 'STATION12', 'STATION13', 'STATION14', 'STATION15', 'STATION16', 'STATION17', 'STATION18',
+      'STATION19', 'STATION20', 'STATION21', 'STATION22', 'STATION23', 'STATION24', 'STATION25', 'STATION26',
+      'STATION27', 'STATION28'
+    ];
+
+    function getTemperatureColor(rainfall) {
+      if (rainfall < 1) return 'green';
+      if (rainfall < 2) return 'yellow';
+      if (rainfall < 3) return 'orange';
+      return 'red';
+    }
+
+    const degreeSymbolPosition = { top: '5px', left: '2px' };
+    const temperatureCardPosition = { top: '0px' };
+
+    function fetchWeather(stationId) {
+      const apiUrl = `https://api.weather.com/v2/pws/observations/current?stationId=${stationId}&format=json&units=e&apiKey=${apiKey}`;
+      return fetch(apiUrl)
+        .then(response => response.json())
+        .then(data => {
+          const observation = data.observations[0];
+          const rainfall = observation.imperial.precipTotal;
+          stationTemperatures[stationId] = { value: rainfall, color: getTemperatureColor(rainfall) };
+        })
+        .catch(error => {
+          console.error(`Error fetching weather for station ${stationId}:`, error);
+          stationTemperatures[stationId] = { value: 'N/A', color: 'white' };
+        });
+    }
+
+    async function updateWeather() {
+      const weatherPromises = stationIds
+        .filter(id => !disabledStations.includes(id))
+        .map(id => fetchWeather(id));
+      await Promise.all(weatherPromises);
+
+      stationIds.forEach((stationId, index) => {
+        if (disabledStations.includes(stationId)) return;
+
+        let stationNameElement = document.getElementById(`station-name-${index + 1}`);
+        if (!stationNameElement) {
+          stationNameElement = document.createElement('div');
+          stationNameElement.id = `station-name-${index + 1}`;
+          stationNameElement.classList.add('weather-card');
+          document.getElementById('weather-info-container').appendChild(stationNameElement);
+        }
+
+        let temperatureElement = document.getElementById(`temperature-${index + 1}`);
+        if (!temperatureElement) {
+          temperatureElement = document.createElement('div');
+          temperatureElement.id = `temperature-${index + 1}`;
+          temperatureElement.classList.add('weather-card');
+          document.getElementById('weather-info-container').appendChild(temperatureElement);
+        }
+
+        const { value, color } = stationTemperatures[stationId] || {};
+        const displayValue = (manualTemperatures[stationId] !== undefined)
+          ? manualTemperatures[stationId]
+          : (value !== undefined ? value : 'Loading...');
+
+        stationNameElement.innerHTML = `
+          <div class="station-name-card">
+            <span class="station-text">${stationNames[stationId]}</span>
+            <button class="edit-temp-btn">Edit</button>
+            <input type="text" class="temp-edit-input" placeholder="Enter temp" />
+          </div>
+        `;
+        temperatureElement.innerHTML = `
+          <div class="temperature-card" style="color: ${color}; top: ${temperatureCardPosition.top};">
+            <span class="temp-value">${displayValue}</span>
+            <span class="degree-symbol" style="top: ${degreeSymbolPosition.top}; left: ${degreeSymbolPosition.left};">"</span>
+          </div>
+        `;
+
+        const { top, left } = stationPositions[stationId];
+        stationNameElement.style.top = top;
+        stationNameElement.style.left = left;
+        temperatureElement.style.top = top;
+        temperatureElement.style.left = left;
+
+        const editButton = stationNameElement.querySelector('.edit-temp-btn');
+        const inputField = stationNameElement.querySelector('.temp-edit-input');
+        const tempCard = temperatureElement.firstElementChild;
+        const tempValueSpan = tempCard.querySelector('.temp-value');
+
+        editButton.addEventListener('click', () => {
+          inputField.style.display = 'inline-block';
+          inputField.value = tempValueSpan.textContent;
+          inputField.focus();
+        });
+
+        inputField.addEventListener('blur', () => {
+          let newTemp = inputField.value.trim();
+          if (newTemp !== '') {
+            manualTemperatures[stationId] = newTemp;
+            tempValueSpan.textContent = newTemp;
+            let numericTemp = parseFloat(newTemp);
+            if (!isNaN(numericTemp)) {
+              let newColor = getTemperatureColor(numericTemp);
+              tempCard.style.color = newColor;
+            }
+          }
+          inputField.style.display = 'none';
+        });
+
+        inputField.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') {
+            inputField.blur();
+          }
+        });
+      });
+    }
+
+    function updateTimestamp() {
+      const timestampElement = document.getElementById('timestamp');
+      const now = new Date();
+      const dayOfWeek = now.toLocaleDateString('en-US', { weekday: 'long' });
+      const month = now.toLocaleDateString('en-US', { month: 'long' });
+      const date = now.getDate();
+      const suffix = (date % 10 === 1 && date !== 11) ? 'st' :
+                     (date % 10 === 2 && date !== 12) ? 'nd' :
+                     (date % 10 === 3 && date !== 13) ? 'rd' : 'th';
+      const formattedTime = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      const formattedTimestamp = `${dayOfWeek}, ${month} ${date}${suffix}: ${formattedTime}`;
+      timestampElement.textContent = formattedTimestamp;
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      updateWeather();
+      setInterval(updateWeather, 5 * 60 * 1000);
+      updateTimestamp();
+      setInterval(updateTimestamp, 60 * 1000);
+    });
+  </script>
+
+</body>
+</html>
